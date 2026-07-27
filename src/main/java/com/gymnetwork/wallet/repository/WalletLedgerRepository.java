@@ -13,4 +13,5 @@ import java.util.UUID;
 public interface WalletLedgerRepository extends JpaRepository<WalletLedgerEntity, UUID> {
     Page<WalletLedgerEntity> findByWalletIdOrderByCreatedAtDesc(UUID walletId, Pageable pageable);
     List<WalletLedgerEntity> findByWalletIdOrderByCreatedAtDesc(UUID walletId);
+    boolean existsByWalletIdAndReferenceIdAndCategory(UUID walletId, String referenceId, String category);
 }

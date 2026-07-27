@@ -3,6 +3,8 @@ package com.gymnetwork.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymnetwork.auth.security.JwtAuthenticationFilter;
 import com.gymnetwork.common.exception.ErrorResponseFactory;
+import com.gymnetwork.common.dto.ApiResponse;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -46,21 +48,19 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(exceptions -> exceptions
-                        .authenticationEntryPoint((request, response, authException) -> {
-                            response.setStatus(HttpStatus.UNAUTHORIZED.value());
-                            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                            objectMapper.writeValue(response.getOutputStream(),
-                                    ErrorResponseFactory.build(HttpStatus.UNAUTHORIZED, "Authentication required", request));
-                        })
-                        .accessDeniedHandler((request, response, accessDeniedException) -> {
-                            response.setStatus(HttpStatus.FORBIDDEN.value());
-                            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                            objectMapper.writeValue(response.getOutputStream(),
-                                    ErrorResponseFactory.build(HttpStatus.FORBIDDEN, "Access denied: Insufficient permissions", request));
-                        })
+                        .authenticationEntryPoint((request, response, authException) -> writeErrorResponse(
+                                response,
+                                HttpServletResponse.SC_UNAUTHORIZED,
+                                "Authentication required"))
+                        .accessDeniedHandler((request, response, accessDeniedException) -> writeErrorResponse(
+                                response,
+                                HttpServletResponse.SC_FORBIDDEN,
+                                "Access denied: Insufficient permissions"))
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/v1/auth/**", "/payments/webhook").permitAll()
+                        .requestMatchers("/api/v1/auth/logout", "/api/v1/auth/change-password", "/api/v1/auth/me").authenticated()
+                        .requestMatchers("/logout", "/change-password", "/me").authenticated()
+                        .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/api-docs/**", "/actuator/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/gyms/**", "/reviews/gym/**").permitAll()
                         .requestMatchers("/admin/**").hasAuthority("ROLE_ADMIN")
@@ -70,5 +70,11 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    private void writeErrorResponse(HttpServletResponse response, int status, String message) throws java.io.IOException {
+        response.setStatus(status);
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        objectMapper.writeValue(response.getWriter(), ApiResponse.error(message));
     }
 }

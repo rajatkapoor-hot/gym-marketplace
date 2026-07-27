@@ -42,7 +42,9 @@ public class PaymentController {
     }
 
     @PostMapping("/webhook")
-    @Operation(summary = "Razorpay Webhook endpoint", description = "Intentionally returns an empty 200 response without ApiResponse so Razorpay receives a provider-compatible acknowledgement.")
+    @Operation(
+            summary = "Razorpay Webhook endpoint",
+            description = "Provider callback endpoint. Successful responses intentionally return an empty body instead of ApiResponse so Razorpay receives only an HTTP status acknowledgment; invalid signatures and malformed payloads return the standard error envelope.")
     public ResponseEntity<Void> handleWebhook(
             @RequestBody String payload,
             @RequestHeader("X-Razorpay-Signature") String signature) {

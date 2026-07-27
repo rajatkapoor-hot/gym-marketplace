@@ -1,5 +1,6 @@
 package com.gymnetwork.user.service.impl;
 
+import com.gymnetwork.booking.dto.response.BookingResponse;
 import com.gymnetwork.common.exception.ResourceNotFoundException;
 import com.gymnetwork.shared.service.BookingInternalService;
 import com.gymnetwork.user.dto.request.UpdateUserProfileRequest;
@@ -94,12 +95,12 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public List<?> getUserBookings(UUID userId) {
+    public List<BookingResponse> getUserBookings(UUID userId) {
         return bookingInternalService.getUserBookings(userId);
     }
 
     @Override
-    public List<?> getUserHistory(UUID userId) {
+    public List<BookingResponse> getUserHistory(UUID userId) {
         return bookingInternalService.getUserBookingHistory(userId);
     }
 

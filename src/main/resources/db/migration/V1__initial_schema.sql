@@ -255,13 +255,13 @@ CREATE TABLE payments (
 -- Bookings Table
 CREATE TABLE bookings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    booking_code VARCHAR(100) UNIQUE NOT NULL,
     user_id UUID NOT NULL REFERENCES users(id),
     gym_id UUID NOT NULL REFERENCES gyms(id),
-    pass_type VARCHAR(50) NOT NULL,
-    price NUMERIC(10,2) NOT NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'CONFIRMED', -- PENDING, CONFIRMED, CHECKED_IN, CANCELLED, EXPIRED
     booking_date DATE NOT NULL,
+    entry_time TIME NOT NULL,
+    exit_time TIME,
+    status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+    amount NUMERIC(12,2) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(100),

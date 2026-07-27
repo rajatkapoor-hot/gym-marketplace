@@ -35,3 +35,7 @@ spring:
 logging:
   level:
     root: WARN
+
+app:
+  auth:
+    dev-mode-enabled: false

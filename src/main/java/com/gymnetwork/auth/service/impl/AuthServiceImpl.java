@@ -3,7 +3,9 @@ package com.gymnetwork.auth.service.impl;
 import com.gymnetwork.auth.dto.request.*;
 import com.gymnetwork.auth.dto.response.AuthResponse;
 import com.gymnetwork.auth.dto.response.UserResponse;
+import com.gymnetwork.auth.config.AuthProperties;
 import com.gymnetwork.auth.security.JwtTokenProvider;
+import com.gymnetwork.auth.service.AuthCodeDeliveryService;
 import com.gymnetwork.auth.service.AuthService;
 import com.gymnetwork.common.exception.BadRequestException;
 import com.gymnetwork.common.exception.ConflictException;
@@ -24,6 +26,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -39,9 +42,14 @@ public class AuthServiceImpl implements AuthService {
     private final JwtTokenProvider tokenProvider;
     private final AuthTokenStore authTokenStore;
     private final WalletInternalService walletInternalService;
+    private final AuthProperties authProperties;
+    private final AuthCodeDeliveryService authCodeDeliveryService;
 
     private static final String REDIS_REFRESH_TOKEN_PREFIX = "REFRESH_TOKEN:";
     private static final String REDIS_OTP_PREFIX = "OTP:";
+    private static final String REDIS_RESET_TOKEN_PREFIX = "RESET_TOKEN:";
+    private static final String DEV_MODE_OTP = "123456";
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     @Override
     @Transactional
@@ -90,7 +98,7 @@ public class AuthServiceImpl implements AuthService {
         authTokenStore.set(
                 REDIS_REFRESH_TOKEN_PREFIX + savedUser.getId(),
                 refreshToken,
-                7, TimeUnit.DAYS
+                tokenProvider.getRefreshTokenExpirationInMs(), TimeUnit.MILLISECONDS
         );
 
         return AuthResponse.builder()
@@ -118,7 +126,7 @@ public class AuthServiceImpl implements AuthService {
         authTokenStore.set(
                 REDIS_REFRESH_TOKEN_PREFIX + user.getId(),
                 refreshToken,
-                7, TimeUnit.DAYS
+                tokenProvider.getRefreshTokenExpirationInMs(), TimeUnit.MILLISECONDS
         );
 
         return AuthResponse.builder()
@@ -152,7 +160,7 @@ public class AuthServiceImpl implements AuthService {
         authTokenStore.set(
                 REDIS_REFRESH_TOKEN_PREFIX + user.getId(),
                 newRefreshToken,
-                7, TimeUnit.DAYS
+                tokenProvider.getRefreshTokenExpirationInMs(), TimeUnit.MILLISECONDS
         );
 
         return AuthResponse.builder()
@@ -174,15 +182,19 @@ public class AuthServiceImpl implements AuthService {
         userRepository.findByEmail(request.getEmail())
                 .ifPresent(user -> {
                     String resetToken = UUID.randomUUID().toString();
-                    authTokenStore.set("RESET_TOKEN:" + resetToken, user.getId().toString(), 15, TimeUnit.MINUTES);
-                    log.info("Simulated sending password reset email to: {} with token: {}", user.getEmail(), resetToken);
+                    authTokenStore.set(REDIS_RESET_TOKEN_PREFIX + resetToken, user.getId().toString(), 15, TimeUnit.MINUTES);
+                    if (authProperties.isDevModeEnabled()) {
+                        log.warn("DEV MODE ONLY: password reset token for {} is {}. Do not enable app.auth.dev-mode-enabled outside local demos.", user.getEmail(), resetToken);
+                    } else {
+                        authCodeDeliveryService.sendPasswordResetToken(user.getEmail(), resetToken);
+                    }
                 });
     }
 
     @Override
     @Transactional
     public void resetPassword(ResetPasswordRequest request) {
-        Object userIdObj = authTokenStore.get("RESET_TOKEN:" + request.getToken());
+        Object userIdObj = authTokenStore.get(REDIS_RESET_TOKEN_PREFIX + request.getToken());
         if (userIdObj == null) {
             throw new BadRequestException("Invalid or expired password reset token");
         }
@@ -194,14 +206,18 @@ public class AuthServiceImpl implements AuthService {
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
 
-        authTokenStore.delete("RESET_TOKEN:" + request.getToken());
+        authTokenStore.delete(REDIS_RESET_TOKEN_PREFIX + request.getToken());
     }
 
     @Override
     public void sendOtp(SendOtpRequest request) {
-        String mockOtp = "123456"; // Default mock OTP for development
-        authTokenStore.set(REDIS_OTP_PREFIX + request.getPhoneNumber(), mockOtp, 5, TimeUnit.MINUTES);
-        log.info("OTP sent to {}: {}", request.getPhoneNumber(), mockOtp);
+        String otp = authProperties.isDevModeEnabled() ? DEV_MODE_OTP : generateOtp();
+        authTokenStore.set(REDIS_OTP_PREFIX + request.getPhoneNumber(), otp, 5, TimeUnit.MINUTES);
+        if (authProperties.isDevModeEnabled()) {
+            log.warn("DEV MODE ONLY: deterministic OTP for {} is {}. Do not enable app.auth.dev-mode-enabled outside local demos.", request.getPhoneNumber(), otp);
+        } else {
+            authCodeDeliveryService.sendOtp(request.getPhoneNumber(), otp);
+        }
     }
 
     @Override
@@ -216,6 +232,14 @@ public class AuthServiceImpl implements AuthService {
             return true;
         }
         return false;
+    }
+
+    private String generateOtp() {
+        String otp;
+        do {
+            otp = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
+        } while (DEV_MODE_OTP.equals(otp));
+        return otp;
     }
 
     @Override
