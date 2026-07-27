@@ -42,6 +42,39 @@ PaymentStatus: CREATED, SUCCESS, FAILED, REFUNDED
 PassType: DAILY, WEEKLY, MONTHLY
 ```
 
+
+## API Response Envelope Exceptions and Error Shape
+
+Most JSON endpoints return the shared `ApiResponse` envelope. Error responses consistently include `success`, `message`, `errors`, and `timestamp`; `errors` includes the HTTP `status`, machine-readable `code`, request `path`, error `timestamp`, and optional `details`.
+
+```json
+{
+  "success": false,
+  "message": "Validation failed",
+  "errors": {
+    "status": 400,
+    "code": "BAD_REQUEST",
+    "path": "/example",
+    "timestamp": "2026-07-27T00:00:00Z",
+    "details": {
+      "field": "reason"
+    }
+  },
+  "timestamp": "2026-07-27T00:00:00Z"
+}
+```
+
+Validation, authentication, authorization, not-found, conflict/business-rule, and unexpected server errors all use this shape. Validation errors place field-level messages under `errors.details`; business-rule errors usually omit `details` and keep the reason in `message`.
+
+The following endpoints intentionally do **not** use `ApiResponse`:
+
+| Endpoint | Response | Reason |
+| --- | --- | --- |
+| `GET /qr/download?gymId={gymId}` | `image/png` bytes | Binary file download; wrapping would corrupt the image payload. |
+| `POST /payments/webhook` | HTTP `200` with an empty body | Third-party Razorpay webhook acknowledgement; returning a minimal provider-compatible success body avoids coupling webhook retries to app response envelope parsing. |
+
+`POST /payments/webhook` remains excluded from bearer authentication because Razorpay authenticates through `X-Razorpay-Signature`, which is verified by the payment service.
+
 ## Shared Auth Packets
 
 ### Register User or Gym Owner
@@ -549,7 +582,7 @@ Other payment endpoints:
 
 ```text
 GET /payments/history?page=0&size=10 -> PageResponse<PaymentResponse>
-POST /payments/webhook -> no ApiResponse wrapper, returns HTTP 200 empty body
+POST /payments/webhook -> no ApiResponse wrapper, returns HTTP 200 empty body (Razorpay-compatible acknowledgement)
 ```
 
 ### Reviews
@@ -683,7 +716,7 @@ Response `data`: `QrResponse`.
 
 `GET /qr/download?gymId={gymId}`
 
-Response: `image/png` bytes, no `ApiResponse` wrapper.
+Response: `image/png` bytes, no `ApiResponse` wrapper because this endpoint is a binary file download.
 
 ## Admin UI Packets
 

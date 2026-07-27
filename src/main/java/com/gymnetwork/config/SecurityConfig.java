@@ -2,12 +2,14 @@ package com.gymnetwork.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymnetwork.auth.security.JwtAuthenticationFilter;
+import com.gymnetwork.common.exception.ErrorResponseFactory;
 import com.gymnetwork.common.dto.ApiResponse;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
