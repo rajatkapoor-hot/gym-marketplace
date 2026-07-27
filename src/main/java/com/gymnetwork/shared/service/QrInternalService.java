@@ -1,7 +1,10 @@
 package com.gymnetwork.shared.service;
 
-import java.util.UUID;
+import com.gymnetwork.shared.dto.QrPayload;
 
 public interface QrInternalService {
-    UUID decryptGymId(String encryptedPayload);
+    /**
+     * Decrypts and validates a versioned JSON QR payload. Legacy raw-UUID QR codes are not accepted and must be regenerated.
+     */
+    QrPayload decryptPayload(String encryptedPayload);
 }

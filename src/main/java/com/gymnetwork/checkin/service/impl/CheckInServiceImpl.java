@@ -11,11 +11,13 @@ import com.gymnetwork.common.dto.PageResponse;
 import com.gymnetwork.common.exception.BadRequestException;
 
 import com.gymnetwork.shared.enums.BookingStatus;
+import com.gymnetwork.shared.dto.QrPayload;
 import com.gymnetwork.shared.event.CheckInCompletedEvent;
 import com.gymnetwork.shared.service.BookingInternalService;
 import com.gymnetwork.shared.service.CheckInInternalService;
 import com.gymnetwork.shared.service.QrInternalService;
 import com.gymnetwork.shared.service.WalletInternalService;
+import com.gymnetwork.shared.service.QrInternalService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -59,6 +61,8 @@ public class CheckInServiceImpl implements CheckInService, CheckInInternalServic
         }
         
         // 2. Validate QR code
+        QrPayload qrPayload = qrInternalService.decryptPayload(request.getQrData());
+        if (!booking.getGymId().equals(qrPayload.gymId())) {
         UUID scannedGymId = qrInternalService.decryptGymId(request.getQrData());
         
         if (!booking.getGymId().equals(scannedGymId)) {
