@@ -1,6 +1,7 @@
 package com.gymnetwork.user.controller;
 
 import com.gymnetwork.auth.security.UserPrincipal;
+import com.gymnetwork.booking.dto.response.BookingResponse;
 import com.gymnetwork.common.dto.ApiResponse;
 import com.gymnetwork.user.dto.request.UpdateUserProfileRequest;
 import com.gymnetwork.user.dto.response.UserProfileResponse;
@@ -46,13 +47,13 @@ public class UserController {
 
     @GetMapping("/history")
     @Operation(summary = "Get user activity/booking history")
-    public ResponseEntity<ApiResponse<List<?>>> getUserHistory(@AuthenticationPrincipal UserPrincipal principal) {
+    public ResponseEntity<ApiResponse<List<BookingResponse>>> getUserHistory(@AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.ok(ApiResponse.success(userService.getUserHistory(principal.getId())));
     }
 
     @GetMapping("/bookings")
     @Operation(summary = "Get user active bookings")
-    public ResponseEntity<ApiResponse<List<?>>> getUserBookings(@AuthenticationPrincipal UserPrincipal principal) {
+    public ResponseEntity<ApiResponse<List<BookingResponse>>> getUserBookings(@AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.ok(ApiResponse.success(userService.getUserBookings(principal.getId())));
     }
 
