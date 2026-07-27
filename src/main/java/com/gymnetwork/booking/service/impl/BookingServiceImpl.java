@@ -112,8 +112,8 @@ public class BookingServiceImpl implements BookingService, BookingInternalServic
     @Transactional
     public void markBookingAsCompleted(UUID bookingId) {
         BookingEntity booking = getBookingEntity(bookingId);
-        if (booking.getStatus() != BookingStatus.CONFIRMED) {
-            throw new BadRequestException("Booking must be CONFIRMED to be marked as COMPLETED");
+        if (booking.getStatus() != BookingStatus.PENDING && booking.getStatus() != BookingStatus.CONFIRMED) {
+            throw new BadRequestException("Booking must be PENDING or CONFIRMED to be marked as COMPLETED");
         }
         booking.setStatus(BookingStatus.COMPLETED);
         bookingRepository.save(booking);
