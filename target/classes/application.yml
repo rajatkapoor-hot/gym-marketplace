@@ -1,0 +1,46 @@
+spring:
+  application:
+    name: gym-marketplace
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
+server:
+  port: 8080
+  error:
+    include-message: always
+    include-binding-errors: always
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-ms: 86400000
+    refresh-expiration-ms: 604800000
+
+  qr:
+    encryption-key: ${QR_SECRET}
+
+  razorpay:
+    key-id: ${RAZORPAY_KEY_ID}
+    key-secret: ${RAZORPAY_KEY_SECRET}
+    webhook-secret: ${RAZORPAY_WEBHOOK_SECRET}
+
+  aws:
+    s3:
+      bucket-name: ${AWS_S3_BUCKET}
+      region: ${AWS_REGION}
+
+  firebase:
+    config-path: ${FIREBASE_CONFIG_PATH}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,info,prometheus
+
+springdoc:
+  api-docs:
+    path: /api-docs
+
+  swagger-ui:
+    path: /swagger-ui.html

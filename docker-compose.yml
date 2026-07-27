@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: gym_user
+      POSTGRES_PASSWORD: gym_password
+      POSTGRES_DB: gym_marketplace
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - gym-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - gym-network
+
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/gym_marketplace
+      - SPRING_DATASOURCE_USERNAME=gym_user
+      - SPRING_DATASOURCE_PASSWORD=gym_password
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - JWT_SECRET=your_super_secret_key_change_me_in_production
+      - JWT_EXPIRATION=86400000
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - gym-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  gym-network:
+    driver: bridge

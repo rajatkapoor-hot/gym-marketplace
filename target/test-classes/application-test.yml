@@ -1,0 +1,45 @@
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+  datasource:
+    url: jdbc:h2:mem:gym_marketplace_test;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: true
+  flyway:
+    enabled: false
+
+app:
+  jwt:
+    secret: test-local-jwt-secret-key-for-hs256-must-be-at-least-32-bytes
+    expiration-ms: 86400000
+    refresh-expiration-ms: 604800000
+
+  qr:
+    encryption-key: 3c9a1e8f2b5d7a4c6e0f2a4b6c8d0e2f
+
+  razorpay:
+    key-id: mock-key-id
+    key-secret: mock-key-secret
+    webhook-secret: mock-webhook-secret
+
+  aws:
+    s3:
+      bucket-name: test-bucket
+      region: ap-south-1
+
+  firebase:
+    config-path: classpath:firebase-test-placeholder.json

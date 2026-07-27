@@ -1,0 +1,60 @@
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+  config:
+    activate:
+      on-profile: dev
+
+  datasource:
+    url: jdbc:h2:mem:gymdb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+
+    show-sql: true
+
+    properties:
+      hibernate:
+        format_sql: true
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  flyway:
+    enabled: false
+
+  cache:
+    type: simple
+
+app:
+  jwt:
+    secret: dev-local-jwt-secret-key-for-hs256-must-be-at-least-32-bytes
+
+  qr:
+    encryption-key: 3c9a1e8f2b5d7a4c6e0f2a4b6c8d0e2f
+
+  razorpay:
+    key-id: mock-key-id
+    key-secret: mock-key-secret
+    webhook-secret: mock-webhook-secret
+
+  aws:
+    s3:
+      bucket-name: local-dev-bucket
+      region: ap-south-1
+
+  firebase:
+    config-path: classpath:firebase-dev-placeholder.json
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
