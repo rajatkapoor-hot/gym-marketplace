@@ -8,7 +8,9 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "check_ins")
+@Table(name = "checkins", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_checkins_booking_id", columnNames = "booking_id")
+})
 @Getter
 @Setter
 @Builder
@@ -22,10 +24,10 @@ public class CheckInEntity extends BaseEntity {
     @Column(name = "gym_id", nullable = false)
     private UUID gymId;
 
-    @Column(name = "booking_id", nullable = false)
+    @Column(name = "booking_id", nullable = false, unique = true)
     private UUID bookingId;
 
-    @Column(name = "check_in_time", nullable = false)
+    @Column(name = "checkin_time", nullable = false)
     private LocalDateTime checkInTime;
 
     @Column(name = "status", nullable = false)
