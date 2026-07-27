@@ -60,6 +60,10 @@ public class JwtTokenProvider {
                 .compact();
     }
 
+    public long getRefreshTokenExpirationInMs() {
+        return refreshTokenExpirationInMs;
+    }
+
     public String generateRefreshToken(UUID userId) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + refreshTokenExpirationInMs);
