@@ -6,6 +6,7 @@ import com.gymnetwork.auth.dto.response.UserResponse;
 import com.gymnetwork.auth.security.UserPrincipal;
 import com.gymnetwork.auth.service.AuthService;
 import com.gymnetwork.common.dto.ApiResponse;
+import com.gymnetwork.common.exception.UnauthorizedException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -43,7 +44,8 @@ public class AuthController {
     @PostMapping("/logout")
     @Operation(summary = "Logout user and revoke refresh token")
     public ResponseEntity<ApiResponse<Void>> logout(@AuthenticationPrincipal UserPrincipal principal) {
-        authService.logout(principal.getId());
+        UserPrincipal authenticatedPrincipal = requireAuthentication(principal);
+        authService.logout(authenticatedPrincipal.getId());
         return ResponseEntity.ok(ApiResponse.success("Logout successful", null));
     }
 
@@ -79,13 +81,22 @@ public class AuthController {
     @Operation(summary = "Change password for authenticated user")
     public ResponseEntity<ApiResponse<Void>> changePassword(@AuthenticationPrincipal UserPrincipal principal,
                                                             @Valid @RequestBody ChangePasswordRequest request) {
-        authService.changePassword(principal.getId(), request);
+        UserPrincipal authenticatedPrincipal = requireAuthentication(principal);
+        authService.changePassword(authenticatedPrincipal.getId(), request);
         return ResponseEntity.ok(ApiResponse.success("Password changed successfully", null));
     }
 
     @GetMapping("/me")
     @Operation(summary = "Get current authenticated user details")
     public ResponseEntity<ApiResponse<UserResponse>> getCurrentUser(@AuthenticationPrincipal UserPrincipal principal) {
-        return ResponseEntity.ok(ApiResponse.success(authService.getCurrentUser(principal.getId())));
+        UserPrincipal authenticatedPrincipal = requireAuthentication(principal);
+        return ResponseEntity.ok(ApiResponse.success(authService.getCurrentUser(authenticatedPrincipal.getId())));
+    }
+
+    private UserPrincipal requireAuthentication(UserPrincipal principal) {
+        if (principal == null) {
+            throw new UnauthorizedException("Authentication required");
+        }
+        return principal;
     }
 }
