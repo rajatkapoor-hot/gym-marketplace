@@ -53,7 +53,7 @@ public class BookingServiceImpl implements BookingService, BookingInternalServic
                 .bookingDate(request.getBookingDate())
                 .entryTime(request.getEntryTime())
                 .amount(amount)
-                .status(BookingStatus.PENDING)
+                .status(BookingStatus.CONFIRMED)
                 .build();
 
         booking = bookingRepository.save(booking);
@@ -103,9 +103,7 @@ public class BookingServiceImpl implements BookingService, BookingInternalServic
         booking.setStatus(BookingStatus.CANCELLED);
         bookingRepository.save(booking);
         
-        // In a real app, publish BookingCancelledEvent so Wallet can process refund if it was CONFIRMED.
-        // Wait, rule says: "Wallet deduction occurs only after successful QR check-in."
-        // So PENDING -> CANCELLED requires no refund.
+        // Wallet deduction occurs only after successful QR check-in, so cancellation never needs a pre-check-in refund.
     }
 
     @Override
@@ -113,7 +111,7 @@ public class BookingServiceImpl implements BookingService, BookingInternalServic
     public void markBookingAsCompleted(UUID bookingId) {
         BookingEntity booking = getBookingEntity(bookingId);
         if (booking.getStatus() != BookingStatus.CONFIRMED) {
-            throw new BadRequestException("Booking must be CONFIRMED to be marked as COMPLETED");
+            throw new BadRequestException("Invalid booking status transition: only CONFIRMED bookings can be marked as COMPLETED, but booking is " + booking.getStatus());
         }
         booking.setStatus(BookingStatus.COMPLETED);
         bookingRepository.save(booking);
@@ -148,7 +146,17 @@ public class BookingServiceImpl implements BookingService, BookingInternalServic
                 .entryTime(booking.getEntryTime())
                 .exitTime(booking.getExitTime())
                 .status(booking.getStatus())
+                .statusDescription(getUiStatusDescription(booking.getStatus()))
                 .amount(booking.getAmount())
                 .build();
+    }
+
+    private String getUiStatusDescription(BookingStatus status) {
+        return switch (status) {
+            case PENDING -> "Awaiting confirmation";
+            case CONFIRMED -> "Confirmed - show your QR at the gym to check in";
+            case COMPLETED -> "Completed - check-in and wallet deduction succeeded";
+            case CANCELLED -> "Cancelled";
+        };
     }
 }

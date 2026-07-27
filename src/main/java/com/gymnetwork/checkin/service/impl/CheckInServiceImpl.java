@@ -47,8 +47,8 @@ public class CheckInServiceImpl implements CheckInService, CheckInInternalServic
         // 1. Get the booking
         BookingResponse booking = bookingService.getBooking(userId, request.getBookingId());
         
-        if (booking.getStatus() != BookingStatus.PENDING && booking.getStatus() != BookingStatus.CONFIRMED) {
-            throw new BadRequestException("Booking is not in a valid state for check-in: " + booking.getStatus());
+        if (booking.getStatus() != BookingStatus.CONFIRMED) {
+            throw new BadRequestException("Invalid booking status for check-in: expected CONFIRMED but was " + booking.getStatus());
         }
         
         if (!booking.getBookingDate().equals(LocalDate.now())) {
