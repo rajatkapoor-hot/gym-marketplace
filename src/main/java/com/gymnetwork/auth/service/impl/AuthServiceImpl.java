@@ -98,7 +98,7 @@ public class AuthServiceImpl implements AuthService {
         authTokenStore.set(
                 REDIS_REFRESH_TOKEN_PREFIX + savedUser.getId(),
                 refreshToken,
-                7, TimeUnit.DAYS
+                tokenProvider.getRefreshTokenExpirationInMs(), TimeUnit.MILLISECONDS
         );
 
         return AuthResponse.builder()
@@ -126,7 +126,7 @@ public class AuthServiceImpl implements AuthService {
         authTokenStore.set(
                 REDIS_REFRESH_TOKEN_PREFIX + user.getId(),
                 refreshToken,
-                7, TimeUnit.DAYS
+                tokenProvider.getRefreshTokenExpirationInMs(), TimeUnit.MILLISECONDS
         );
 
         return AuthResponse.builder()
@@ -160,7 +160,7 @@ public class AuthServiceImpl implements AuthService {
         authTokenStore.set(
                 REDIS_REFRESH_TOKEN_PREFIX + user.getId(),
                 newRefreshToken,
-                7, TimeUnit.DAYS
+                tokenProvider.getRefreshTokenExpirationInMs(), TimeUnit.MILLISECONDS
         );
 
         return AuthResponse.builder()
