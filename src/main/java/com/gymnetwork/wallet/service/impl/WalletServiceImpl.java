@@ -149,7 +149,7 @@ public class WalletServiceImpl implements WalletService, WalletInternalService {
     @Override
     @Transactional
     public void deductWallet(UUID userId, BigDecimal amount, String referenceId, String description) {
-        WalletEntity wallet = getWalletEntityByUserId(userId);
+        WalletEntity wallet = getWalletEntityByUserIdForUpdate(userId);
         
         if (wallet.getBalance().compareTo(amount) < 0) {
             throw new BadRequestException("Insufficient wallet balance for this transaction");
@@ -164,7 +164,7 @@ public class WalletServiceImpl implements WalletService, WalletInternalService {
                 .walletId(updatedWallet.getId())
                 .referenceId(referenceId)
                 .type("DEBIT")
-                .category("BOOKING")
+                .category("CHECKIN_DEDUCTION")
                 .amount(amount)
                 .balanceAfter(newBalance)
                 .description(description)
