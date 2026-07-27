@@ -1,10 +1,14 @@
 package com.gymnetwork.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymnetwork.auth.security.JwtAuthenticationFilter;
+import com.gymnetwork.common.dto.ApiResponse;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -24,6 +28,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final ObjectMapper objectMapper;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -40,7 +45,19 @@ public class SecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint((request, response, authException) -> writeErrorResponse(
+                                response,
+                                HttpServletResponse.SC_UNAUTHORIZED,
+                                "Authentication required"))
+                        .accessDeniedHandler((request, response, accessDeniedException) -> writeErrorResponse(
+                                response,
+                                HttpServletResponse.SC_FORBIDDEN,
+                                "Access denied: Insufficient permissions"))
+                )
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/v1/auth/logout", "/api/v1/auth/change-password", "/api/v1/auth/me").authenticated()
+                        .requestMatchers("/logout", "/change-password", "/me").authenticated()
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/api-docs/**", "/actuator/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/gyms/**", "/reviews/gym/**").permitAll()
@@ -51,5 +68,11 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    private void writeErrorResponse(HttpServletResponse response, int status, String message) throws java.io.IOException {
+        response.setStatus(status);
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        objectMapper.writeValue(response.getWriter(), ApiResponse.error(message));
     }
 }

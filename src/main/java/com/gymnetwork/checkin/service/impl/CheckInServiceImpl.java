@@ -15,6 +15,7 @@ import com.gymnetwork.shared.dto.QrPayload;
 import com.gymnetwork.shared.event.CheckInCompletedEvent;
 import com.gymnetwork.shared.service.BookingInternalService;
 import com.gymnetwork.shared.service.CheckInInternalService;
+import com.gymnetwork.shared.service.QrInternalService;
 import com.gymnetwork.shared.service.WalletInternalService;
 import com.gymnetwork.shared.service.QrInternalService;
 import lombok.RequiredArgsConstructor;
@@ -47,8 +48,8 @@ public class CheckInServiceImpl implements CheckInService, CheckInInternalServic
         // 1. Get the booking
         BookingResponse booking = bookingService.getBooking(userId, request.getBookingId());
         
-        if (booking.getStatus() != BookingStatus.PENDING && booking.getStatus() != BookingStatus.CONFIRMED) {
-            throw new BadRequestException("Booking is not in a valid state for check-in: " + booking.getStatus());
+        if (booking.getStatus() != BookingStatus.CONFIRMED) {
+            throw new BadRequestException("Invalid booking status for check-in: expected CONFIRMED but was " + booking.getStatus());
         }
         
         if (!booking.getBookingDate().equals(LocalDate.now())) {
@@ -62,6 +63,9 @@ public class CheckInServiceImpl implements CheckInService, CheckInInternalServic
         // 2. Validate QR code
         QrPayload qrPayload = qrInternalService.decryptPayload(request.getQrData());
         if (!booking.getGymId().equals(qrPayload.gymId())) {
+        UUID scannedGymId = qrInternalService.decryptGymId(request.getQrData());
+        
+        if (!booking.getGymId().equals(scannedGymId)) {
             throw new BadRequestException("QR code belongs to a different gym");
         }
         
@@ -130,4 +134,5 @@ public class CheckInServiceImpl implements CheckInService, CheckInInternalServic
                 .status(checkIn.getStatus())
                 .build();
     }
+
 }
