@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -121,17 +122,22 @@ public class BookingServiceImpl implements BookingService, BookingInternalServic
 
     @Override
     @Transactional(readOnly = true)
-    public java.util.List<?> getUserBookings(UUID userId) {
-        // Return active/upcoming bookings for user. Just returning empty list for mock.
-        // Needs proper mapping and response DTO
-        return java.util.Collections.emptyList();
+    public List<BookingResponse> getUserBookings(UUID userId) {
+        return bookingRepository.findByUserIdAndStatusInOrderByBookingDateAscEntryTimeAsc(
+                        userId, List.of(BookingStatus.PENDING, BookingStatus.CONFIRMED))
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
     }
 
     @Override
     @Transactional(readOnly = true)
-    public java.util.List<?> getUserBookingHistory(UUID userId) {
-        // Return completed/cancelled bookings for user.
-        return java.util.Collections.emptyList();
+    public List<BookingResponse> getUserBookingHistory(UUID userId) {
+        return bookingRepository.findByUserIdAndStatusInOrderByBookingDateAscEntryTimeAsc(
+                        userId, List.of(BookingStatus.COMPLETED, BookingStatus.CANCELLED, BookingStatus.EXPIRED))
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
     }
 
     private BookingEntity getBookingEntity(UUID bookingId) {
