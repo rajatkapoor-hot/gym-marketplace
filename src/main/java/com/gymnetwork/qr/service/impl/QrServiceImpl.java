@@ -2,6 +2,11 @@ package com.gymnetwork.qr.service.impl;
 
 import com.gymnetwork.common.exception.BadRequestException;
 import com.gymnetwork.common.exception.ResourceNotFoundException;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.WriterException;
+import com.google.zxing.client.j2se.MatrixToImageWriter;
+import com.google.zxing.common.BitMatrix;
+import com.google.zxing.qrcode.QRCodeWriter;
 import com.gymnetwork.qr.dto.response.QrResponse;
 import com.gymnetwork.qr.service.QrService;
 import com.gymnetwork.shared.service.GymInternalService;
@@ -14,6 +19,8 @@ import org.springframework.stereotype.Service;
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Base64;
@@ -32,6 +39,8 @@ public class QrServiceImpl implements QrService, QrInternalService {
     private static final String ALGORITHM = "AES/GCM/NoPadding";
     private static final int GCM_TAG_LENGTH = 128;
     private static final int IV_LENGTH = 12;
+    private static final int QR_CODE_SIZE = 300;
+    private static final String PNG_FORMAT = "PNG";
 
     @Override
     public QrResponse getGymQr(UUID gymId) {
@@ -42,7 +51,7 @@ public class QrServiceImpl implements QrService, QrInternalService {
         return QrResponse.builder()
                 .gymId(gymId)
                 .encryptedPayload(encryptedPayload)
-                .qrCodeDataUrl("data:image/png;base64," + Base64.getEncoder().encodeToString(encryptedPayload.getBytes(StandardCharsets.UTF_8)))
+                .qrCodeDataUrl("data:image/png;base64," + Base64.getEncoder().encodeToString(generateQrPng(encryptedPayload)))
                 .build();
     }
 
@@ -53,8 +62,10 @@ public class QrServiceImpl implements QrService, QrInternalService {
 
     @Override
     public byte[] generateQrImage(UUID gymId) {
-        QrResponse response = getGymQr(gymId);
-        return response.getEncryptedPayload().getBytes(StandardCharsets.UTF_8);
+        if (!gymInternalService.existsById(gymId)) {
+            throw new ResourceNotFoundException("Gym not found with ID: " + gymId);
+        }
+        return generateQrPng(encryptGymId(gymId));
     }
 
     @Override
@@ -80,6 +91,20 @@ public class QrServiceImpl implements QrService, QrInternalService {
         } catch (Exception e) {
             log.error("Failed to decrypt QR payload", e);
             throw new BadRequestException("Invalid or tampered QR code payload");
+        }
+    }
+
+    private byte[] generateQrPng(String encryptedPayload) {
+        try {
+            QRCodeWriter qrCodeWriter = new QRCodeWriter();
+            BitMatrix bitMatrix = qrCodeWriter.encode(encryptedPayload, BarcodeFormat.QR_CODE, QR_CODE_SIZE, QR_CODE_SIZE);
+
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            MatrixToImageWriter.writeToStream(bitMatrix, PNG_FORMAT, outputStream);
+            return outputStream.toByteArray();
+        } catch (WriterException | IOException e) {
+            log.error("Error generating QR PNG image", e);
+            throw new RuntimeException("Failed to generate QR code image", e);
         }
     }
 
