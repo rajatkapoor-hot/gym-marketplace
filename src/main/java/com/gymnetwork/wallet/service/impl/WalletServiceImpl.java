@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Objects;
 import java.util.UUID;
 
 @Slf4j
@@ -50,7 +51,16 @@ public class WalletServiceImpl implements WalletService, WalletInternalService {
     @Override
     @Transactional
     public WalletResponse rechargeWallet(UUID userId, RechargeWalletRequest request) {
-        WalletEntity wallet = getWalletEntityByUserId(userId);
+        WalletEntity wallet = getWalletEntityByUserIdForUpdate(userId);
+        String referenceId = request.getPaymentReferenceId();
+        String category = "RECHARGE";
+
+        if (Objects.nonNull(referenceId)
+                && walletLedgerRepository.existsByWalletIdAndReferenceIdAndCategory(wallet.getId(), referenceId, category)) {
+            log.info("Skipping duplicate wallet recharge for walletId={}, referenceId={}, category={}",
+                    wallet.getId(), referenceId, category);
+            return mapToResponse(wallet);
+        }
         
         BigDecimal newBalance = wallet.getBalance().add(request.getAmount());
         wallet.setBalance(newBalance);
@@ -59,9 +69,9 @@ public class WalletServiceImpl implements WalletService, WalletInternalService {
         
         WalletLedgerEntity ledger = WalletLedgerEntity.builder()
                 .walletId(updatedWallet.getId())
-                .referenceId(request.getPaymentReferenceId())
+                .referenceId(referenceId)
                 .type("CREDIT")
-                .category("RECHARGE")
+                .category(category)
                 .amount(request.getAmount())
                 .balanceAfter(newBalance)
                 .description("Wallet recharge")
@@ -164,6 +174,11 @@ public class WalletServiceImpl implements WalletService, WalletInternalService {
 
     private WalletEntity getWalletEntityByUserId(UUID userId) {
         return walletRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Wallet not found for user: " + userId));
+    }
+
+    private WalletEntity getWalletEntityByUserIdForUpdate(UUID userId) {
+        return walletRepository.findByUserIdForUpdate(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Wallet not found for user: " + userId));
     }
 
