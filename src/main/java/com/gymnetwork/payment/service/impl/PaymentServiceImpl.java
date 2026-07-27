@@ -7,6 +7,7 @@ import com.gymnetwork.payment.dto.request.CreateOrderRequest;
 import com.gymnetwork.payment.dto.request.VerifyPaymentRequest;
 import com.gymnetwork.payment.dto.response.OrderResponse;
 import com.gymnetwork.payment.dto.response.PaymentResponse;
+import com.gymnetwork.payment.dto.response.WebhookResponse;
 import com.gymnetwork.payment.entity.PaymentEntity;
 import com.gymnetwork.payment.repository.PaymentRepository;
 import com.gymnetwork.payment.service.PaymentService;
@@ -19,6 +20,7 @@ import com.razorpay.RazorpayException;
 import com.razorpay.Utils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -131,38 +133,71 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
-    public void handleWebhook(String payload, String signature) {
+    public WebhookResponse handleWebhook(String payload, String signature) {
+        boolean isValid;
         try {
-            boolean isValid = Utils.verifyWebhookSignature(payload, signature, razorpayWebhookSecret);
-            if (!isValid) {
-                log.error("Invalid webhook signature");
-                return;
-            }
-            
+            isValid = Utils.verifyWebhookSignature(payload, signature, razorpayWebhookSecret);
+        } catch (RazorpayException e) {
+            log.warn("Invalid Razorpay webhook signature", e);
+            throw new BadRequestException("Invalid Razorpay webhook signature");
+        }
+
+        if (!isValid) {
+            log.warn("Invalid Razorpay webhook signature");
+            throw new BadRequestException("Invalid Razorpay webhook signature");
+        }
+
+        try {
             JSONObject jsonPayload = new JSONObject(payload);
             String event = jsonPayload.getString("event");
-            
-            if ("payment.captured".equals(event)) {
-                JSONObject paymentPayload = jsonPayload.getJSONObject("payload").getJSONObject("payment").getJSONObject("entity");
-                String orderId = paymentPayload.getString("order_id");
-                
-                paymentRepository.findByRazorpayOrderId(orderId).ifPresent(payment -> {
-                    if (payment.getStatus() == PaymentStatus.CREATED) {
-                        payment.setStatus(PaymentStatus.SUCCESS);
-                        payment.setRazorpayPaymentId(paymentPayload.getString("id"));
-                        paymentRepository.save(payment);
-                        
-                        // Top-up wallet in case webhook arrives before client verify call
-                        RechargeWalletRequest rechargeRequest = new RechargeWalletRequest();
-                        rechargeRequest.setAmount(payment.getAmount());
-                        rechargeRequest.setPaymentReferenceId(payment.getRazorpayPaymentId());
-                        walletInternalService.rechargeWallet(payment.getUserId(), rechargeRequest);
-                    }
-                });
+
+            if (!"payment.captured".equals(event)) {
+                return WebhookResponse.builder()
+                        .event(event)
+                        .status(WebhookResponse.WebhookStatus.IGNORED)
+                        .build();
             }
-            
-        } catch (Exception e) {
-            log.error("Failed to process webhook", e);
+
+            JSONObject paymentPayload = jsonPayload.getJSONObject("payload").getJSONObject("payment").getJSONObject("entity");
+            String orderId = paymentPayload.getString("order_id");
+            PaymentEntity payment = paymentRepository.findByRazorpayOrderId(orderId)
+                    .orElse(null);
+
+            if (payment == null) {
+                log.warn("Received payment.captured webhook for unknown Razorpay order {}", orderId);
+                return WebhookResponse.builder()
+                        .event(event)
+                        .orderId(orderId)
+                        .status(WebhookResponse.WebhookStatus.UNKNOWN_ORDER)
+                        .build();
+            }
+
+            if (payment.getStatus() == PaymentStatus.SUCCESS) {
+                return WebhookResponse.builder()
+                        .event(event)
+                        .orderId(orderId)
+                        .status(WebhookResponse.WebhookStatus.DUPLICATE)
+                        .build();
+            }
+
+            payment.setStatus(PaymentStatus.SUCCESS);
+            payment.setRazorpayPaymentId(paymentPayload.getString("id"));
+            paymentRepository.save(payment);
+
+            // Top-up wallet in case webhook arrives before client verify call. Duplicate SUCCESS events are ignored above.
+            RechargeWalletRequest rechargeRequest = new RechargeWalletRequest();
+            rechargeRequest.setAmount(payment.getAmount());
+            rechargeRequest.setPaymentReferenceId(payment.getRazorpayPaymentId());
+            walletInternalService.rechargeWallet(payment.getUserId(), rechargeRequest);
+
+            return WebhookResponse.builder()
+                    .event(event)
+                    .orderId(orderId)
+                    .status(WebhookResponse.WebhookStatus.HANDLED)
+                    .build();
+        } catch (JSONException e) {
+            log.warn("Malformed Razorpay webhook payload", e);
+            throw new BadRequestException("Malformed Razorpay webhook payload");
         }
     }
 
