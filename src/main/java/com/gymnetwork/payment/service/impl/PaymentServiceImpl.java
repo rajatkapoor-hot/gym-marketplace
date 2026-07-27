@@ -88,7 +88,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional
     public PaymentResponse verifyPayment(UUID userId, VerifyPaymentRequest request) {
-        PaymentEntity payment = paymentRepository.findByRazorpayOrderId(request.getRazorpayOrderId())
+        PaymentEntity payment = paymentRepository.findByRazorpayOrderIdForUpdate(request.getRazorpayOrderId())
                 .orElseThrow(() -> new ResourceNotFoundException("Payment order not found"));
                 
         if (!payment.getUserId().equals(userId)) {
@@ -96,6 +96,7 @@ public class PaymentServiceImpl implements PaymentService {
         }
         
         if (payment.getStatus() == PaymentStatus.SUCCESS) {
+            completePaymentAndRechargeWallet(payment, request.getRazorpayPaymentId(), request.getRazorpaySignature());
             return mapToResponse(payment);
         }
         
@@ -108,17 +109,7 @@ public class PaymentServiceImpl implements PaymentService {
             boolean isValidSignature = Utils.verifyPaymentSignature(options, razorpayKeySecret);
             
             if (isValidSignature) {
-                payment.setRazorpayPaymentId(request.getRazorpayPaymentId());
-                payment.setRazorpaySignature(request.getRazorpaySignature());
-                payment.setStatus(PaymentStatus.SUCCESS);
-                paymentRepository.save(payment);
-                
-                // Top-up wallet
-                RechargeWalletRequest rechargeRequest = new RechargeWalletRequest();
-                rechargeRequest.setAmount(payment.getAmount());
-                rechargeRequest.setPaymentReferenceId(payment.getRazorpayPaymentId());
-                walletInternalService.rechargeWallet(userId, rechargeRequest);
-                
+                completePaymentAndRechargeWallet(payment, request.getRazorpayPaymentId(), request.getRazorpaySignature());
                 return mapToResponse(payment);
             } else {
                 payment.setStatus(PaymentStatus.FAILED);
@@ -156,6 +147,13 @@ public class PaymentServiceImpl implements PaymentService {
                         .event(event)
                         .status(WebhookResponse.WebhookStatus.IGNORED)
                         .build();
+            
+            if ("payment.captured".equals(event)) {
+                JSONObject paymentPayload = jsonPayload.getJSONObject("payload").getJSONObject("payment").getJSONObject("entity");
+                String orderId = paymentPayload.getString("order_id");
+                
+                paymentRepository.findByRazorpayOrderIdForUpdate(orderId).ifPresent(payment ->
+                        completePaymentAndRechargeWallet(payment, paymentPayload.getString("id"), null));
             }
 
             JSONObject paymentPayload = jsonPayload.getJSONObject("payload").getJSONObject("payment").getJSONObject("entity");
@@ -208,6 +206,22 @@ public class PaymentServiceImpl implements PaymentService {
         return PageResponse.from(page.map(this::mapToResponse));
     }
     
+    private void completePaymentAndRechargeWallet(PaymentEntity payment, String razorpayPaymentId, String razorpaySignature) {
+        if (payment.getStatus() == PaymentStatus.CREATED) {
+            payment.setRazorpayPaymentId(razorpayPaymentId);
+            payment.setRazorpaySignature(razorpaySignature);
+            payment.setStatus(PaymentStatus.SUCCESS);
+            paymentRepository.save(payment);
+        }
+
+        RechargeWalletRequest rechargeRequest = new RechargeWalletRequest();
+        rechargeRequest.setAmount(payment.getAmount());
+        rechargeRequest.setPaymentReferenceId(payment.getRazorpayPaymentId() != null
+                ? payment.getRazorpayPaymentId()
+                : razorpayPaymentId);
+        walletInternalService.rechargeWallet(payment.getUserId(), rechargeRequest);
+    }
+
     private PaymentResponse mapToResponse(PaymentEntity payment) {
         return PaymentResponse.builder()
                 .id(payment.getId())
