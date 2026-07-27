@@ -14,6 +14,7 @@ import com.gymnetwork.shared.enums.BookingStatus;
 import com.gymnetwork.shared.event.CheckInCompletedEvent;
 import com.gymnetwork.shared.service.BookingInternalService;
 import com.gymnetwork.shared.service.CheckInInternalService;
+import com.gymnetwork.shared.service.QrInternalService;
 import com.gymnetwork.shared.service.WalletInternalService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,9 +38,7 @@ public class CheckInServiceImpl implements CheckInService, CheckInInternalServic
     private final BookingInternalService bookingInternalService;
     private final WalletInternalService walletInternalService;
     private final ApplicationEventPublisher eventPublisher;
-    // Assume QrService has a method to decrypt or validate QR data and return Gym ID
-    // Since we don't have decrypt in QrService yet, we'll simulate it for now.
-    // In actual implementation, we'd add decryptQr(String qrData) to QrService.
+    private final QrInternalService qrInternalService;
 
     @Override
     @Transactional
@@ -60,16 +59,7 @@ public class CheckInServiceImpl implements CheckInService, CheckInInternalServic
         }
         
         // 2. Validate QR code
-        // For now, assume the QR data string is the Gym UUID directly or encrypted.
-        // E.g., we'll just check if it contains the Gym UUID as a simple simulation
-        // In real impl: UUID scannedGymId = qrService.decryptQr(request.getQrData());
-        String decryptedData = decryptSimulate(request.getQrData());
-        UUID scannedGymId;
-        try {
-            scannedGymId = UUID.fromString(decryptedData);
-        } catch (IllegalArgumentException e) {
-            throw new BadRequestException("Invalid QR code");
-        }
+        UUID scannedGymId = qrInternalService.decryptGymId(request.getQrData());
         
         if (!booking.getGymId().equals(scannedGymId)) {
             throw new BadRequestException("QR code belongs to a different gym");
@@ -140,10 +130,5 @@ public class CheckInServiceImpl implements CheckInService, CheckInInternalServic
                 .status(checkIn.getStatus())
                 .build();
     }
-    
-    private String decryptSimulate(String data) {
-        // Simulate decryption - in a real scenario, this would use QrService + AES-GCM
-        // We'll just assume the data passed is the raw gym ID for this mock or we can extract it if it's JSON
-        return data;
-    }
+
 }
