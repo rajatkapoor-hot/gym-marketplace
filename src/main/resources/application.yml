@@ -11,6 +11,9 @@ server:
     include-binding-errors: always
 
 app:
+  auth:
+    dev-mode-enabled: ${APP_AUTH_DEV_MODE_ENABLED:false}
+
   jwt:
     secret: ${JWT_SECRET}
     expiration-ms: 86400000

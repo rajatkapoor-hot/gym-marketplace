@@ -166,7 +166,7 @@ Request:
 ```json
 {
   "phoneNumber": "9000000000",
-  "otp": "123456"
+  "otp": "<otp-from-sms-or-dev-mode-log>"
 }
 ```
 
@@ -721,3 +721,9 @@ Admin settlement approval/update
 ```
 
 The UI can display/read many gym objects, but management write APIs for Gym Owner/Admin are not present yet.
+
+## Auth demo-safe OTP and password reset flows
+
+Local demo shortcuts are guarded by `app.auth.dev-mode-enabled` and are enabled only in the `dev` profile. When this flag is `true`, `/api/v1/auth/send-otp` stores the deterministic demo OTP `123456`, and `/api/v1/auth/forgot-password` writes the password reset token to a warning log so local demo users can complete the flow without real SMS/email credentials.
+
+For `test`, `uat`, `prod`, and any other production-like profile, keep `app.auth.dev-mode-enabled=false`. In those modes OTPs are randomly generated, password reset tokens are never logged in full, and both values are sent through the `AuthCodeDeliveryService` abstraction so a real SMS/email provider can be wired in safely.
