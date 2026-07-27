@@ -34,3 +34,7 @@ spring:
 
   cache:
     type: redis
+
+app:
+  auth:
+    dev-mode-enabled: false

@@ -35,6 +35,9 @@ spring:
     type: simple
 
 app:
+  auth:
+    dev-mode-enabled: true
+
   jwt:
     secret: dev-local-jwt-secret-key-for-hs256-must-be-at-least-32-bytes
 
