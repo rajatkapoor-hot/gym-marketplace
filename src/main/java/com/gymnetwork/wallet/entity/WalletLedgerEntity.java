@@ -8,7 +8,9 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 @Entity
-@Table(name = "wallet_ledgers")
+@Table(name = "wallet_ledgers", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_wallet_ledger_idempotency", columnNames = {"wallet_id", "reference_id", "category"})
+})
 @Getter
 @Setter
 @Builder
