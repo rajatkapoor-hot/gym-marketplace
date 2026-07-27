@@ -42,7 +42,7 @@ public class PaymentController {
     }
 
     @PostMapping("/webhook")
-    @Operation(summary = "Razorpay Webhook endpoint")
+    @Operation(summary = "Razorpay Webhook endpoint", description = "Intentionally returns an empty 200 response without ApiResponse so Razorpay receives a provider-compatible acknowledgement.")
     public ResponseEntity<Void> handleWebhook(
             @RequestBody String payload,
             @RequestHeader("X-Razorpay-Signature") String signature) {
