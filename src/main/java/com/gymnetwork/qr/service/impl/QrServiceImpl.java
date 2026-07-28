@@ -14,6 +14,7 @@ import com.gymnetwork.qr.service.QrService;
 import com.gymnetwork.shared.dto.QrPayload;
 import com.gymnetwork.shared.service.GymInternalService;
 import com.gymnetwork.shared.service.QrInternalService;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,6 +33,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -41,10 +43,16 @@ public class QrServiceImpl implements QrService, QrInternalService {
 
     private final GymInternalService gymInternalService;
     private final ObjectMapper objectMapper;
-    private Clock clock = Clock.systemUTC();
+    private final Clock clock;
 
-    @Value("${app.qr.encryption-key:3c9a1e8f2b5d7a4c6e0f2a4b6c8d0e2f}")
-    private String secretKey;
+    /**
+     * No default value on purpose: an unset key must fail application startup
+     * rather than silently fall back to a key value that's sitting in source control.
+     * Must be a hex-encoded string representing 16, 24, or 32 raw bytes
+     * (AES-128 / AES-192 / AES-256).
+     */
+    @Value("${app.qr.encryption-key}")
+    private String secretKeyHex;
 
     @Value("${app.qr.ttl:PT24H}")
     private Duration qrTtl;
@@ -55,6 +63,20 @@ public class QrServiceImpl implements QrService, QrInternalService {
     private static final int PAYLOAD_VERSION = 1;
     private static final int QR_CODE_SIZE = 300;
     private static final String PNG_FORMAT = "PNG";
+    private static final Set<Integer> VALID_KEY_LENGTHS = Set.of(16, 24, 32);
+
+    private byte[] keyBytes;
+
+    @PostConstruct
+    void validateKey() {
+        byte[] decoded = decodeHexKey(secretKeyHex);
+        if (!VALID_KEY_LENGTHS.contains(decoded.length)) {
+            throw new IllegalStateException(
+                    "app.qr.encryption-key must decode to 16, 24, or 32 bytes (128/192/256-bit AES key), "
+                            + "but decoded to " + decoded.length + " bytes");
+        }
+        this.keyBytes = decoded;
+    }
 
     @Override
     public QrResponse getGymQr(UUID gymId) {
@@ -79,7 +101,9 @@ public class QrServiceImpl implements QrService, QrInternalService {
         if (!gymInternalService.existsById(gymId)) {
             throw new ResourceNotFoundException("Gym not found with ID: " + gymId);
         }
-        return generateQrPng(encryptGymId(gymId));
+        // Encrypt a proper QrPayload (not just the raw UUID) so this stays
+        // decryptable by decryptPayload, which always expects QrPayload JSON.
+        return generateQrPng(encryptPayload(newPayload(gymId)));
     }
 
     @Override
@@ -97,13 +121,7 @@ public class QrServiceImpl implements QrService, QrInternalService {
             byte[] cipherText = new byte[cipherTextSize];
             System.arraycopy(cipherTextWithIv, IV_LENGTH, cipherText, 0, cipherTextSize);
 
-            SecretKeySpec keySpec = new SecretKeySpec(getKeyBytes(), "AES");
-            GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
-
-            Cipher cipher = Cipher.getInstance(ALGORITHM);
-            cipher.init(Cipher.DECRYPT_MODE, keySpec, gcmSpec);
-
-            byte[] plainText = cipher.doFinal(cipherText);
+            byte[] plainText = decrypt(cipherText, iv);
             QrPayload payload = readPayload(plainText);
             validatePayload(payload);
             return payload;
@@ -113,6 +131,9 @@ public class QrServiceImpl implements QrService, QrInternalService {
         } catch (GeneralSecurityException e) {
             log.error("Failed to decrypt QR payload", e);
             throw new BadRequestException("Unable to decrypt QR code payload");
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            throw new BadRequestException("Unable to read QR code payload");
         }
     }
 
@@ -132,7 +153,7 @@ public class QrServiceImpl implements QrService, QrInternalService {
         }
     }
 
-    private QrPayload readPayload(byte[] plainText) {
+    private QrPayload readPayload(byte[] plainText) throws IOException {
         try {
             return objectMapper.readValue(plainText, QrPayload.class);
         } catch (JsonProcessingException e) {
@@ -144,12 +165,61 @@ public class QrServiceImpl implements QrService, QrInternalService {
         if (payload.gymId() == null || payload.issuedAt() == null || payload.expiresAt() == null || payload.version() <= 0) {
             throw new BadRequestException("QR code payload is missing required fields");
         }
-        if (payload.expiresAt().isBefore(Instant.now(clock)) || payload.expiresAt().equals(Instant.now(clock))) {
+        if (payload.version() != PAYLOAD_VERSION) {
+            throw new BadRequestException("Unsupported QR code payload version: " + payload.version());
+        }
+        Instant now = Instant.now(clock);
+        if (!payload.expiresAt().isAfter(now)) {
             throw new BadRequestException("QR code has expired");
         }
     }
 
     private String encryptPayload(QrPayload payload) {
+        try {
+            return encrypt(objectMapper.writeValueAsBytes(payload));
+        } catch (JsonProcessingException e) {
+            log.error("Error serializing QR payload", e);
+            throw new RuntimeException("Failed to encrypt QR payload", e);
+        }
+    }
+
+    /**
+     * Shared AES-GCM encrypt routine: generates a fresh random IV, encrypts
+     * plaintext, and returns Base64(iv || ciphertext+tag).
+     */
+    private String encrypt(byte[] plainText) {
+        try {
+            byte[] iv = new byte[IV_LENGTH];
+            new SecureRandom().nextBytes(iv);
+
+            SecretKeySpec keySpec = new SecretKeySpec(keyBytes, "AES");
+            GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
+
+            Cipher cipher = Cipher.getInstance(ALGORITHM);
+            cipher.init(Cipher.ENCRYPT_MODE, keySpec, gcmSpec);
+
+            byte[] cipherText = cipher.doFinal(plainText);
+            byte[] finalPayload = new byte[IV_LENGTH + cipherText.length];
+
+            System.arraycopy(iv, 0, finalPayload, 0, IV_LENGTH);
+            System.arraycopy(cipherText, 0, finalPayload, IV_LENGTH, cipherText.length);
+
+            return Base64.getEncoder().encodeToString(finalPayload);
+        } catch (GeneralSecurityException e) {
+            log.error("Error encrypting QR payload", e);
+            throw new RuntimeException("Failed to encrypt QR payload", e);
+        }
+    }
+
+    private byte[] decrypt(byte[] cipherText, byte[] iv) throws GeneralSecurityException {
+        SecretKeySpec keySpec = new SecretKeySpec(keyBytes, "AES");
+        GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
+
+        Cipher cipher = Cipher.getInstance(ALGORITHM);
+        cipher.init(Cipher.DECRYPT_MODE, keySpec, gcmSpec);
+        return cipher.doFinal(cipherText);
+    }
+
     private byte[] generateQrPng(String encryptedPayload) {
         try {
             QRCodeWriter qrCodeWriter = new QRCodeWriter();
@@ -164,34 +234,23 @@ public class QrServiceImpl implements QrService, QrInternalService {
         }
     }
 
-    private String encryptGymId(UUID gymId) {
-        try {
-            byte[] iv = new byte[IV_LENGTH];
-            new SecureRandom().nextBytes(iv);
-
-            SecretKeySpec keySpec = new SecretKeySpec(getKeyBytes(), "AES");
-            GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
-
-            Cipher cipher = Cipher.getInstance(ALGORITHM);
-            cipher.init(Cipher.ENCRYPT_MODE, keySpec, gcmSpec);
-
-            byte[] cipherText = cipher.doFinal(objectMapper.writeValueAsBytes(payload));
-            byte[] finalPayload = new byte[IV_LENGTH + cipherText.length];
-
-            System.arraycopy(iv, 0, finalPayload, 0, IV_LENGTH);
-            System.arraycopy(cipherText, 0, finalPayload, IV_LENGTH, cipherText.length);
-
-            return Base64.getEncoder().encodeToString(finalPayload);
-        } catch (Exception e) {
-            log.error("Error encrypting QR code payload", e);
-            throw new RuntimeException("Failed to generate encrypted QR code", e);
+    private byte[] decodeHexKey(String hex) {
+        if (hex == null || hex.isBlank()) {
+            throw new IllegalStateException("app.qr.encryption-key must be configured");
         }
-    }
-
-    private byte[] getKeyBytes() {
-        byte[] key = secretKey.getBytes(StandardCharsets.UTF_8);
-        byte[] result = new byte[16];
-        System.arraycopy(key, 0, result, 0, Math.min(key.length, 16));
+        String normalized = hex.trim();
+        if (normalized.length() % 2 != 0) {
+            throw new IllegalStateException("app.qr.encryption-key must be a valid hex string (even length)");
+        }
+        byte[] result = new byte[normalized.length() / 2];
+        for (int i = 0; i < result.length; i++) {
+            int hi = Character.digit(normalized.charAt(i * 2), 16);
+            int lo = Character.digit(normalized.charAt(i * 2 + 1), 16);
+            if (hi < 0 || lo < 0) {
+                throw new IllegalStateException("app.qr.encryption-key must be a valid hex string");
+            }
+            result[i] = (byte) ((hi << 4) + lo);
+        }
         return result;
     }
 }

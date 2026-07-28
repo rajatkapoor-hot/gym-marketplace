@@ -1,2 +1,13 @@
-/home/omi/.gemini/antigravity/scratch/gym-marketplace/src/test/java/com/gymnetwork/BaseIntegrationTest.java
-/home/omi/.gemini/antigravity/scratch/gym-marketplace/src/test/java/com/gymnetwork/GymMarketplaceApplicationTests.java
+/home/omi/Java/gym-marketplace/src/test/java/com/gymnetwork/BaseIntegrationTest.java
+/home/omi/Java/gym-marketplace/src/test/java/com/gymnetwork/GymMarketplaceApplicationTests.java
+/home/omi/Java/gym-marketplace/src/test/java/com/gymnetwork/auth/SecurityExceptionHandlingTest.java
+/home/omi/Java/gym-marketplace/src/test/java/com/gymnetwork/auth/service/impl/AuthServiceImplTest.java
+/home/omi/Java/gym-marketplace/src/test/java/com/gymnetwork/booking/BookingCheckInIntegrationTest.java
+/home/omi/Java/gym-marketplace/src/test/java/com/gymnetwork/booking/service/impl/BookingServiceImplTest.java
+/home/omi/Java/gym-marketplace/src/test/java/com/gymnetwork/checkin/repository/CheckInRepositoryTest.java
+/home/omi/Java/gym-marketplace/src/test/java/com/gymnetwork/checkin/service/impl/CheckInServiceImplTest.java
+/home/omi/Java/gym-marketplace/src/test/java/com/gymnetwork/common/exception/ErrorResponseControllerTest.java
+/home/omi/Java/gym-marketplace/src/test/java/com/gymnetwork/payment/service/impl/PaymentServiceImplIdempotencyTest.java
+/home/omi/Java/gym-marketplace/src/test/java/com/gymnetwork/payment/service/impl/PaymentServiceImplTest.java
+/home/omi/Java/gym-marketplace/src/test/java/com/gymnetwork/qr/service/impl/QrServiceImplTest.java
+/home/omi/Java/gym-marketplace/src/test/java/com/gymnetwork/wallet/service/impl/WalletServiceImplConcurrencyTest.java

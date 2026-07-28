@@ -163,6 +163,8 @@ public class BookingServiceImpl implements BookingService, BookingInternalServic
             case CONFIRMED -> "Confirmed - show your QR at the gym to check in";
             case COMPLETED -> "Completed - check-in and wallet deduction succeeded";
             case CANCELLED -> "Cancelled";
+            case EXPIRED -> "Expired";
+            default -> "Unknown status";
         };
     }
 }

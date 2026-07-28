@@ -8,29 +8,18 @@ import com.gymnetwork.shared.dto.QrPayload;
 import com.gymnetwork.shared.service.GymInternalService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
-
-import java.time.Duration;
-import java.time.Instant;
-import com.gymnetwork.shared.service.GymInternalService;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
-class QrServiceImplTest {
-
-    private GymInternalService gymInternalService;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -45,9 +34,8 @@ class QrServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        gymInternalService = mock(GymInternalService.class);
         ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
-        qrService = new QrServiceImpl(gymInternalService, objectMapper);
+        qrService = new QrServiceImpl(gymInternalService, objectMapper, null);
         ReflectionTestUtils.setField(qrService, "secretKey", "test-secret-key-1234567890");
         ReflectionTestUtils.setField(qrService, "qrTtl", Duration.ofHours(24));
     }
@@ -108,8 +96,6 @@ class QrServiceImplTest {
         assertThatThrownBy(() -> qrService.decryptPayload("not valid base64!*"))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessage("Malformed QR code payload");
-        qrService = new QrServiceImpl(gymInternalService);
-        ReflectionTestUtils.setField(qrService, "secretKey", "3c9a1e8f2b5d7a4c6e0f2a4b6c8d0e2f");
     }
 
     @Test

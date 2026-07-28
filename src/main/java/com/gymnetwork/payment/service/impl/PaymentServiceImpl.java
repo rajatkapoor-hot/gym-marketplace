@@ -147,13 +147,6 @@ public class PaymentServiceImpl implements PaymentService {
                         .event(event)
                         .status(WebhookResponse.WebhookStatus.IGNORED)
                         .build();
-            
-            if ("payment.captured".equals(event)) {
-                JSONObject paymentPayload = jsonPayload.getJSONObject("payload").getJSONObject("payment").getJSONObject("entity");
-                String orderId = paymentPayload.getString("order_id");
-                
-                paymentRepository.findByRazorpayOrderIdForUpdate(orderId).ifPresent(payment ->
-                        completePaymentAndRechargeWallet(payment, paymentPayload.getString("id"), null));
             }
 
             JSONObject paymentPayload = jsonPayload.getJSONObject("payload").getJSONObject("payment").getJSONObject("entity");

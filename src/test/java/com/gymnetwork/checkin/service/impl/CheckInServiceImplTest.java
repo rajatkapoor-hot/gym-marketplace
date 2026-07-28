@@ -63,7 +63,7 @@ class CheckInServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        qrService = new QrServiceImpl(gymInternalService);
+        qrService = new QrServiceImpl(gymInternalService, null, null);
         ReflectionTestUtils.setField(qrService, "secretKey", "3c9a1e8f2b5d7a4c6e0f2a4b6c8d0e2f");
         checkInService = new CheckInServiceImpl(
                 checkInRepository,
