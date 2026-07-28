@@ -14,7 +14,6 @@ CREATE INDEX idx_gyms_owner ON gyms(owner_id);
 -- Indexing for Booking Lookup & Verification
 CREATE INDEX idx_bookings_user ON bookings(user_id, status);
 CREATE INDEX idx_bookings_gym_date ON bookings(gym_id, booking_date, status);
-CREATE INDEX idx_bookings_code ON bookings(booking_code);
 
 -- Indexing for Check-in & Review Lookups
 CREATE INDEX idx_checkins_booking ON checkins(booking_id);

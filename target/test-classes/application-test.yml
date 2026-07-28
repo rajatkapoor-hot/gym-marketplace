@@ -23,6 +23,9 @@ spring:
     enabled: false
 
 app:
+  auth:
+    dev-mode-enabled: false
+
   jwt:
     secret: test-local-jwt-secret-key-for-hs256-must-be-at-least-32-bytes
     expiration-ms: 86400000
